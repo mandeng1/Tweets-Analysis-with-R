@@ -1,5 +1,5 @@
 
-# What people whatching on Netflix during this period
+# What people whatching on Netflix during this period?
 
 ## Background explanation
 We are in a crisis situation that has led us to change our habits. Today, more than half of the world’s population remains confined. Some of them have lost their jobs, their activities which cannot be replaced by telework.Peoples are changing their behaviours.They involuntarily find themselves in front of the TV or on their computers watching TV shows or movies.
