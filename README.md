@@ -9,9 +9,9 @@ We asked ourselves how **Netflix** is handling this abundant flow of customers o
 ### Description of the search query
 To analyse what’s being said on netflix, we analysed all tweets that mention **netflix** and decided to take 72,000 tweets between **“2020-04-30 14:07:55” and “2020-05-01 14:51:05”.**
 
-<img src="word cloud.png" />
+<img src="Word cloud.PNG" />
 
 
 
 
-<img src="Frequent words.png" />
+<img src="Frequent words.PNG" />
