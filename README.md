@@ -17,5 +17,8 @@ To analyse what’s being said on netflix, we analysed all tweets that mention *
 
 <img src="Frequent Words.PNG" />
 
-#### Topics
-<img src="Frequent Words.PNG" />
+# Author
+Jean Marie Mandeng
+Msc Student in Big Data , Marketing and Management
+
+
