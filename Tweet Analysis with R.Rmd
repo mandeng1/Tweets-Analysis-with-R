@@ -1,0 +1,581 @@
+---
+title: "What people whatching on Netflix during this period"
+output:html_document
+---
+
+```{r setup,include=FALSE}
+if (!require(rtweet)) {install.packages('rtweet')}
+if (!require(magrittr)) {install.packages('magrittr')}
+if (!require(data.table)) {install.packages('data.table')}
+if (!require(ggplot2)) {install.packages('ggplot2')}
+if (!require(graphics)) {install.packages('graphics')}
+if (!require(topicmodels)) {install.packages('topicmodels')}
+if (!require(quanteda)) {install.packages('quanteda')}
+if (!require(stats)) {install.packages('stats')}
+if (!require(grDevices)) {install.packages('grDevices')}
+if (!require(utils)) {install.packages('utils')}
+if (!require(methods)) {install.packages('methods')}
+require(topicmodels)
+library(tidytext)
+library(sentimentr)
+```
+
+# I-Background 
+
+## I-1. Background explanation
+
+ We are in a crisis situation that has led us to change our habits. Today, more than half of the world's population remains confined. Some of them have lost their jobs, their activities which cannot be replaced by telework.Peoples are changing their behaviours.They involuntarily find themselves in front of the TV or on their computers watching TV shows or movies.
+
+ We asked ourselves how **Netflix** is handling this abundant flow of customers on their platforms, what activities (series, movies, innovations) are popular, and how netflix customers feel about the streaming service during this period.
+
+## I-2. Description of the search query
+
+To analyse what's being said on netflix, we analysed all tweets that mention netflix and decided to take 72,000 tweets between "2020-04-30 14:07:55" and "2020-05-01 14:51:05".
+
+## I-3. Some general data
+
+We have downloaded data (from https://trends.google.com/ ) representing the number of searches on the word **netflix** over 1 year. We see that on the selected sample, the number of searches to increase in the world since the beginning of the **COVID-19 crisis ( December 2020).** 
+
+```{r}
+netflix=read.csv(file='C:/Users/jm_ma/Desktop/cours text analysis/multiTimeline.csv')
+netflix
+
+```
+
+
+Number of searches on **Netflix** over 12 months in the world.
+
+
+```{r}
+setDT(netflix) 
+netflix$date <- as.Date(netflix$X2019.05.05)
+ggplot(netflix, aes(x=date, y=X41)) + geom_line()
+       
+```
+
+
+## I.4 Chart over volume on twitter on the subject
+
+We're uploading the file of tweets we recorded
+
+```{r}
+load(file ='tweets.RData' )
+
+```
+
+## Our data:
+
+```{r}
+tweets.df=A.df
+tweets.df
+```
+
+changing dataframe to data.table
+
+```{r}
+setDT(tweets.df) 
+```
+
+## Number of tweets per country
+
+```{r}
+tweets.df[,.(.N), by = .(country)] [order(-N)]
+```
+As you can see, the people who talk more about netflix are more in the USA.
+
+```{r}
+tweets.df[, chunk:= created_at %>% cut(breaks = "5 min") %>% as.factor ]
+```
+
+## Retweet_count, quotes and like by country 
+
+```{r}
+tweets.df[,.(TotalTweets = .N, 
+             total_reactions=sum(retweet_count, na.rm = TRUE) + 
+                sum(favorite_count, na.rm = TRUE)+
+                sum(reply_count, na.rm = TRUE)+
+                sum(quote_count, na.rm = TRUE)), 
+          by = .(country)] [order(-total_reactions)]
+```
+
+# Number of Tweets per minute
+
+```{r}
+ggplot(tweets.df, aes(x=created_at)) +
+   geom_histogram(aes(y=..count..), #make histogram
+                  binwidth=60*15, #each bar contains number of tweets during 60 s
+                  colour="blue", #colour of frame of bars
+                  fill="blue", #fill colour for bars
+                  alpha=0.8) + # bars are semi transparant
+   ggtitle(paste0("tweeets Activities ")) + #title
+   scale_y_continuous(name="Number of Tweets per minute") + 
+   scale_x_datetime(name = "Time") +
+   theme_minimal()
+```
+We can see that over the course of a day, people spend a lot of time tweeting until 6 a.m. and resting until noon. This shows the effect of lockdows on people. they have nothing to do with their day.
+
+Let's try to see what's going on in the USA.
+
+```{r}
+query="Netflix"
+num_tweets=18000
+USA=tweets.df[tweets.df$country=='United States']
+```
+
+#tweets matching "Netflix" in USA.
+
+```{r}
+ggplot(USA, aes(
+   x=created_at, 
+   y=(friends_count+1), 
+   size = favorite_count + reply_count + quote_count + retweet_count )
+   ) +
+   geom_point(aes(size = retweet_count), alpha = 0.5) +
+   ggtitle(paste0("Each dot is a tweet matching '",query,"'")) +
+   scale_y_log10(name="Potential Reach",breaks = c(10,100,1000,10000) ) +
+   scale_x_datetime(name = "Time") +
+   scale_size_continuous(name="Retweets") +
+   theme_minimal()
+```
+There are few retweets in USA but a lot of tweets. That is to say that each person wants to talk about it.  
+# II-Hypothesis
+
+By collecting this data, we hope to see which series or movies are the most popular, what problems users are experiencing, whether the high number of subscribers has degraded the quality of netflix's services, which netflix's competitors are mentioned.
+
+# III-Analysis and infographics
+
+## III-1.Common terms or common n-grams. 
+
+```{r}
+tok_tweets <- tweets.df$text %>% 
+   gsub("#","", . ) %>% 
+   corpus %>% 
+   tokens(what="word",
+          remove_numbers=TRUE,
+          remove_punct=TRUE,
+          remove_symbols=TRUE,
+          remove_separators=TRUE,
+          remove_url=TRUE)
+head(tok_tweets,n=2)
+```
+
+
+```{r}
+tok_tweets <- tokens_remove(tok_tweets,stopwords(language = "en"))
+head(tok_tweets,n=2)
+```
+
+
+
+```{r}
+words.to.remove <- c(stopwords("english"),'Netflix',"Netflix's","Netflix‘s","@Netflix","#Netflix")
+dfmat_corp_twitter <- tweets.df$text %>% corpus() %>% 
+   dfm(remove = words.to.remove,
+                          what = "word",
+                          stem = TRUE, 
+                          remove_punct = TRUE,
+                          remove_url=TRUE)
+```
+
+
+```{r}
+dfFreq <- textstat_frequency(dfmat_corp_twitter) %>% as.data.table
+ggplot(dfFreq[1:20,], aes(x=reorder(feature, -rank), y=frequency)) + 
+   geom_col() +
+   coord_flip() +
+   labs(x = "Stemmed word", y = "Count") +
+   theme_minimal()
+```
+wordcloud
+
+```{r}
+textplot_wordcloud(dfmat_corp_twitter, min_count = 6, random_order = FALSE,
+                   rotation = .25,
+                   color = RColorBrewer::brewer.pal(8, "Dark2"))
+```
+
+people watch a lot of movies and series based on the previous graphs.
+
+```{r}
+dfFreq_long_top20 = dfFreq[rank <= 20] %>% 
+   melt(id.vars = c("feature","group","rank"),
+        measure.vars = c("frequency","docfreq")
+)
+
+```
+
+```{r}
+ggplot(dfFreq_long_top20, aes(x=reorder(feature,-rank), y=value, fill = variable)) + 
+   geom_bar(position="dodge", stat="identity") +
+   scale_x_discrete() + 
+   labs(x = "", y = "Occurances", fill = "") +
+   coord_flip() +
+   theme_minimal()
+```
+people watch a lot of movies and series based on the previous graphs.
+
+## 2-grammes
+
+```{r}
+TokensStemmed <- tokens_remove(tok_tweets, words.to.remove)
+
+dfm2 <- dfm(tokens_ngrams(TokensStemmed,n=2))
+
+dfFreq2 <- textstat_frequency(dfm2)
+
+ggplot(dfFreq2[1:40,], aes(x=reorder(feature, frequency), y=frequency)) + 
+   geom_col() +
+   coord_flip() +
+   scale_x_discrete(name = "2 gram") +
+   theme(text=element_text(size=10))
+
+```
+## III-2.data by Topic 
+
+```{r}
+dtm <- convert(dfmat_corp_twitter, to = "topicmodels")
+lda <- LDA(dtm, k = 6, control=list(seed=12))
+```
+
+
+```{r}
+topicAssignment = 
+   data.table(
+      index = lda %>% 
+         topics %>% 
+         names %>% 
+         gsub("text","", .) 
+      %>% as.integer,
+      topic = lda %>% topics
+   )
+topicAssignment %>% head(4)
+```
+
+
+```{r}
+tweets.df$Topic = NA # creates a new col ‘topic’, assign it to NA
+tweets.df$Topic[topicAssignment$index] = topicAssignment$topic
+```
+
+```{r}
+tweets.df$Topic = tweets.df$Topic %>% as.factor
+```
+
+
+```{r}
+ggplot(tweets.df, aes(x=created_at, y=Topic, col=Topic)) +
+   geom_jitter(aes(size = retweet_count)) +
+   ggtitle(paste0("Each dot is a tweet matching '",query,"'")) +
+   scale_y_discrete() +
+   scale_x_datetime(name = "") + 
+   scale_color_discrete(guide = FALSE) + 
+   scale_size_continuous(name="Retweets")
+```
+
+
+```{r}
+tweets.df[!is.na(Topic),
+          list(
+             TotalTweets = .N, 
+             TotalReactions=sum(retweet_count, na.rm = TRUE) + 
+                sum(favorite_count, na.rm = TRUE)+
+                sum(reply_count, na.rm = TRUE)+
+                sum(quote_count, na.rm = TRUE),
+             Reach = sum(followers_count)/10000
+             ), 
+          by = Topic] %>% 
+   melt(id.vars = "Topic") %>% 
+   ggplot(aes(x = Topic, y = value, fill=variable)) +
+      geom_bar(position="dodge", stat="identity") + 
+      scale_fill_discrete(name= "", breaks=c("TotalTweets","TotalReactions","Reach"), labels = c("Tweets","Reactions","Reach in 10,000s")) + 
+      scale_y_continuous(name = "Count")
+```
+2 grames
+
+```{r}
+dfm2 <- dfm(tokens_ngrams(TokensStemmed,n=2))
+```
+
+
+```{r}
+dfm2 <- convert(dfm2, to = "topicmodels")
+lda2 <- LDA(dfm2, k = 6, control=list(seed=123))
+terms(lda2, 8)
+```
+
+
+```{r}
+topicAssignment2grams = 
+   data.table(
+      index = lda2 %>% 
+         topics %>% 
+         names %>% 
+         gsub("text","", .) 
+      %>% as.integer,
+      topic = lda2 %>% topics
+   )
+tweets.df$Topic2gram = NA # creates a new col ‘topic’, assign it to NA
+tweets.df$Topic2gram[topicAssignment2grams$index] = topicAssignment2grams$topic
+tweets.df$Topic2gram = tweets.df$Topic2gram %>% as.factor
+```
+
+
+```{r}
+ggplot(tweets.df, aes(x=created_at, y=Topic2gram, col=Topic2gram)) +
+   geom_jitter(aes(size = retweet_count)) +
+   ggtitle(paste0("Each dot is a tweet matching '",query,"'")) +
+   scale_y_discrete() +
+   scale_x_datetime(name = "") + 
+   scale_color_discrete(guide = FALSE) + 
+   scale_size_continuous(name="Retweets")
+```
+
+```{r}
+tweets.df[!is.na(Topic2gram),
+          list(
+             TotalTweets = .N, 
+             TotalReactions=sum(retweet_count, na.rm = TRUE) + 
+                sum(favorite_count, na.rm = TRUE)+
+                sum(reply_count, na.rm = TRUE)+
+                sum(quote_count, na.rm = TRUE),
+             Reach = sum(followers_count)/10000
+             ), 
+          by = Topic2gram] %>% 
+   melt(id.vars = "Topic2gram") %>% 
+   ggplot(aes(x = Topic2gram, y = value, fill=variable)) +
+      geom_bar(position="dodge", stat="identity") + 
+      scale_fill_discrete(name= "", breaks=c("TotalTweets","TotalReactions","Reach"), labels = c("Tweets","Reactions","Reach in 10,000s")) + 
+      scale_y_continuous(name = "Count")
+```
+
+
+```{r}
+tweets.df[Topic == 1][1:10,.(text)]
+```
+
+```{r}
+ggplot(tweets.df[Topic == 1], aes(x = followers_count)) + geom_histogram(binwidth = 10) + xlim(c(0,300))
+```
+
+```{r}
+tweets.df[Topic==2][1:10,.(text)]
+```
+
+
+```{r}
+library(tidytext)
+tweet_topics <- tidy(lda, matrix = "beta") %>% as.data.table
+
+tweet_topics[order(-beta),.SD[1:3],by = topic][order(topic)]
+```
+
+
+```{r}
+tweet_topics[order(-beta),.SD[1:10],by = topic] %>% 
+  ggplot(aes(x = reorder_within(term,beta,topic), y = beta, fill = factor(topic))) +
+    geom_col(show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free") +
+   scale_x_reordered() + 
+    coord_flip() + 
+   theme_minimal()
+```
+
+```{r}
+fstat <- dfmat_corp_twitter[1:3,] %>% 
+   dfm_trim(min_termfreq = , termfreq_type = "quantile") %>%
+   textstat_dist(margin="features")
+```
+
+
+```{r}
+plot(hclust(as.dist(fstat)))
+```
+
+slides 3
+
+```{r}
+library(vosonSML)
+```
+
+
+```{r}
+class(tweets.df) <- c(class(tweets.df),"datasource","twitter")
+class(tweets.df)
+```
+
+```{r}
+## actor network - nodes are users who have tweeted
+actorGraph <- tweets.df[1:1000,] %>%      # tweets data table
+   Create("actor") %>%             # Actor graph 
+   Graph()                         # igraph network grap
+```
+
+# III-3.Network analysis
+
+```{r}
+get_igraph_attrs <- function(igraph){
+   library(igraph)
+   if(!is_igraph(igraph)) stop("Not a graph object")
+   list(graph_attrs = list.graph.attributes(igraph),
+        vertex_attrs = list.vertex.attributes(igraph),
+        edge_attrs = list.edge.attributes(igraph))
+}
+
+top.ranked.users <- function(actorGraph) {
+   user.rank <- page.rank(actorGraph, directed=TRUE)
+   user.top <-sort(user.rank$vector,decreasing=TRUE,index.return=TRUE)
+   users.ranked <- V(actorGraph)$screen_name[user.top$ix]
+   return(users.ranked)
+}
+
+
+simplify.actor.network <- function(igraph,
+                                   remove.loops = TRUE,
+                                   delete.zero.degree = FALSE) {
+   library(igraph)
+   igraph = simplify(igraph, 
+                     remove.multiple = FALSE, 
+                     remove.loops = remove.loops,
+                     edge.attr.comb = "max")
+   if (delete.zero.degree) {
+      igraph=delete.vertices(simplify(igraph), degree(igraph)==0)
+   }
+   return(igraph)
+}
+
+# Plot medium sized networks with reasonable defaults.
+plot.actor.Graph <- function(igraph, layout = layout_with_fr(igraph, niter = 1000),
+    ## aspect ratio =================================
+    asp = 0,
+    ## labels =======================================
+    ## colors =======================================
+    vertex.color = rgb(0.33,0.33,0.33,0.5),      ## grey with opacity 30%
+    vertex.frame.color = rgb(1.00,1.00,1.00,1), ## white border color no opacity
+    ## shapes =======================================
+    vertex.shape = "circle",      ## none, circle, square, csquare, 
+                                  ## vrectangle, pie, raster, sphere
+                                  ## rectangle, crectangle
+    ## sizes =======================================
+    vertex.size = 2.1,             ## size, default = 15
+    vertex.size2 = NA,             ## second dimension size (for parallelograms)
+    ## edges =======================================
+    edge.color = rgb(0.5,0.5,0.5,0.5),      ## darkgrey with opacity 30%
+    edge.width = 0.5,             ## default = 1
+    edge.arrow.size = 0.2,        ## default = 1
+    edge.arrow.width = 0.5,       ## default = 1
+    edge.lty = "solid",           ## linetype: blank, solid, dashed, dotted,
+                                  ## dotdash, longdash, or twodash
+    edge.curved = 0.15,           ## 0 to 1 or TRUE (0.5)
+    ...) {
+   y = list(...)
+   if (length(y)==0) {plot.igraph(igraph, layout= layout, asp = asp, vertex.color = vertex.color, vertex.frame.color = vertex.frame.color,vertex.shape =vertex.shape,vertex.size = vertex.size, vertex.size2 = vertex.size2, edge.color = edge.color, edge.width = edge.width,  edge.arrow.size = edge.arrow.size, edge.arrow.width = edge.arrow.width, edge.lty = edge.lty, edge.curved = edge.curved) }
+   else {plot.igraph(igraph, vertex.label = y$vertex.label, layout= layout, asp = asp, vertex.color = vertex.color, vertex.frame.color = vertex.frame.color,vertex.shape =vertex.shape,vertex.size = vertex.size, vertex.size2 = vertex.size2, edge.color = edge.color, edge.width = edge.width,  edge.arrow.size = edge.arrow.size, edge.arrow.width = edge.arrow.width, edge.lty = edge.lty, edge.curved = edge.curved) }
+}
+
+label.user.network <- function(actorGraph , named.users) {
+   V(actorGraph)$label <- V(actorGraph)$screen_name
+   V(actorGraph)$label[which(!V(actorGraph)$label %in% named.users)] <- NA
+   return(actorGraph)
+}
+
+neighborhood.to.user <- function(actorGraph, screen_name, k.nearest.neighbours = 1) {
+   index <- which(V(actorGraph)$screen_name==screen_name)
+   neigborhood.of.index <- neighborhood(actorGraph,order = k.nearest.neighbours, nodes = index)
+   v.index <- c(unlist(neigborhood.of.index),index)
+   
+   partialGraph <- induced_subgraph(actorGraph,v.index)
+   return(partialGraph)
+}
+
+```
+
+
+```{r}
+get_igraph_attrs(actorGraph)
+```
+
+
+```{r}
+actorGraph.simplyfied = simplify.actor.network(actorGraph, remove.loops = TRUE, delete.zero.degree = TRUE)
+```
+
+
+```{r}
+grep("^layout_with_.*[^[sugiyama]]*", ls("package:igraph"), value = TRUE) %>%  print
+```
+
+
+```{r}
+plot.actor.Graph(actorGraph.simplyfied, 
+                  vertex.label = NA, 
+                  layout = layout_with_graphopt)
+```
+
+The top ranked users (using the google rank algorithm) are
+
+```{r}
+top.ranked.users(actorGraph.simplyfied)[1:15]
+```
+
+```{r}
+named.users = top.ranked.users(actorGraph.simplyfied)[1:20]
+```
+
+```{r}
+actorGraph.named = label.user.network(actorGraph.simplyfied,
+                                      named.users)
+plot.actor.Graph(actorGraph.named,layout = layout_with_graphopt)
+```
+
+# III-4.Sentiment Analysis
+
+```{r}
+library(sentimentr)
+```
+
+
+```{r}
+df <- tweets.df[,.(created_at,text,Topic)]
+```
+
+
+```{r}
+df$roundTime <- as.POSIXct(cut(df$created_at, breaks = "5 mins"))
+```
+
+
+
+```{r}
+sentiment_by_tweet = 
+   df[,
+      list(text %>% get_sentences %>% sentiment_by(),
+           Topic)]
+# In df:
+#   select all rows
+#          send text column to function get_sentences, then to
+#          sentiment_by as above
+
+sentiment_by_tweet
+```
+
+
+```{r}
+sentiment_by_Topic = 
+   sentiment_by_tweet[, list(Tweets = .N,
+           ave_sentiment = mean(ave_sentiment),
+           sd_sentiment = sd(ave_sentiment),
+           Total_word_count = sum(word_count)),
+      by = Topic]
+sentiment_by_Topic
+```
+
+
+```{r}
+df$polarity_score = sentiment_by_tweet$ave_sentiment
+ggplot(df,aes(x=roundTime, y=polarity_score, fill=roundTime)) + 
+   geom_boxplot()
+```
+
+# Conclusion
+
+At the end of our analysis, we found that in this period of containment, people watch a lot of series, documentary films on netflix, notably the series "The Last Kingdom". The most cited competitors are: Amazon, Hulu. For the quality of service, people don't complain, but many want to switch to premium accounts to get access to more content, and Netflix allows them to forget about the tragedy that's going on right now because no one is talking about the corona virus.
