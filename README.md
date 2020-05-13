@@ -1,4 +1,4 @@
-# Tweets-Analysis-with-R
+
 # What people whatching on Netflix during this period
 
 ## Background explanation
@@ -18,7 +18,8 @@ To analyse what’s being said on netflix, we analysed all tweets that mention *
 <img src="Frequent Words.PNG" />
 
 # Author
-Jean Marie Mandeng
-Msc Student in Big Data , Marketing and Management
+<br>**Jean Marie Mandeng** <br/>
+Msc Student in Big Data Marketing and Management at Toulouse Business School.<br/>
+<a href="https://www.linkedin.com/in/jean-marie-mandeng/">My Linkedln </a>
 
 
